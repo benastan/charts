@@ -6,7 +6,7 @@ window.addEventListener('load', Charts.refreshCharts);
 require('./lib/charts');
 require('./lib/plugins');
 
-},{".":2,"./lib/charts":5,"./lib/plugins":15}],2:[function(require,module,exports){
+},{".":2,"./lib/charts":5,"./lib/plugins":17}],2:[function(require,module,exports){
 module.exports = require('./lib');
 },{"./lib":12}],3:[function(require,module,exports){
 function minAndMax(data, property) {
@@ -25,11 +25,11 @@ function calculatePadding(paddingOption) {
 }
 
 module.exports = function(chart) {
-  var $svg, data, document, el, layeres, options, padding, parentNode, ranges, scales, statistics, svg;
-  el = chart.el;
+  var $svg, data, layers, options, padding, ranges, scales, statistics;
   data = chart.data;
   options = chart.options;
-  document = chart.document;
+  options.plugins.unshift('d3-layers');
+  options.plugins.unshift('d3-svg');
 
   if (!options.radius) options.radius = 3;
   if (!options['padding']) options['padding'] = '5';
@@ -46,12 +46,6 @@ module.exports = function(chart) {
       ranges.y.push(padding[0]);
       ranges.x.unshift(padding[3]);
 
-      $svg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
-      parentNode = el.parentNode;
-      parentNode.appendChild($svg);
-      parentNode.insertBefore(el, $svg);
-      this.svg = svg = d3.select($svg);
-
       this.statistics = statistics = {};
       statistics.minX = d3.min(data, function(datum) { return datum.x });
       statistics.maxX = d3.max(data, function(datum) { return datum.x });
@@ -66,14 +60,9 @@ module.exports = function(chart) {
 
     paint: function() {
 
-      this.layers = layers = {};
+      layers = this.layers;
 
-      layers.base = svg.append('rect')
-        .attr('width', '100%')
-        .attr('height', '100%')
-        .attr('fill', '#ffffff');
-
-      layers.wrapper = svg.append('g')
+      layers.wrapper = this.svg.append('g')
         .selectAll('g')
         .data(data)
         .enter();
@@ -83,9 +72,8 @@ module.exports = function(chart) {
     plot: function() {
 
       layers.group = layers.wrapper.append('g');
-
       layers.point = layers.group.append('g').attr('class', 'data-point');
-
+      
       if (this.hijackPlot) return;
       
       layers.circle = layers.point.append('circle')
@@ -98,21 +86,14 @@ module.exports = function(chart) {
 }
 
 },{}],4:[function(require,module,exports){
-function minAndMax(data, property) {
-  var min, max;
-  min = d3.min(data, function(datum) { datum.property });
-  max = d3.max(data, function(datum) { datum.property });
-  return [min, max]
-}
-
-module.exports = function(chart) {
+module.exports =
+function(chart) {
   
-  var $svg, arc, color, data, document, el, innerRadius, layeres, options, padding, parentNode, radius, svg;
-  el = chart.el;
-  data = chart.data;
+  var $svg, arc, color, innerRadius, layers, options, radius, svg;
   options = chart.options;
-  document = chart.document;
   radius = options.radius;
+  options.plugins.unshift('d3-layers');
+  options.plugins.unshift('d3-svg');
   
   if (!options['inner-radius']) options['inner-radius'] = 0;
   innerRadius = options['inner-radius'];
@@ -121,36 +102,18 @@ module.exports = function(chart) {
 
     setup: function() {
 
-      $svg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
-      parentNode = el.parentNode;
-      parentNode.appendChild($svg);
-      parentNode.insertBefore(el, $svg);
-      
-      this.svg = svg = d3.select($svg);
-
-      this.arc = arc = d3.svg.arc()
-        .outerRadius(radius)
-        .innerRadius(innerRadius);
-
-      this.pie = pie = d3.layout.pie()
-        .sort(null)
-        .value(function(d) { return d.value; });
+      this.arc = arc = d3.svg.arc().outerRadius(radius).innerRadius(innerRadius);
+      this.pie = pie = d3.layout.pie().sort(null).value(function(d) { return d.value; });
 
     },
 
     paint: function() {
 
-      this.layers = layers = {};
-
-      layers.base = svg.append('rect')
-        .attr('width', '100%')
-        .attr('height', '100%')
-        .attr('fill', '#ffffff');
-
-      layers.wrapper = svg.append('g')
+      layers = this.layers;
+      layers.wrapper = this.svg.append('g')
         .attr("transform", 'translate('+radius+','+radius+')')
         .selectAll('g')
-        .data(pie(data))
+        .data(pie(this.data))
         .enter();
 
     },
@@ -158,10 +121,7 @@ module.exports = function(chart) {
     plot: function() {
 
       layers.group = layers.wrapper.append('g').attr('class', 'pie-wedge');
-
-      layers.arc = layers.group.append("path")
-        .attr("d", arc);
-
+      layers.arc = layers.group.append("path").attr("d", arc);
       layers.text = layers.group.append("text")
         .attr("transform", function(datum) { return "translate(" + arc.centroid(datum) + ")"; })
         .attr("dy", ".35em")
@@ -201,12 +161,18 @@ function buildChart(chartConfig) {
   builder = ChartRegistry[chartConfig.options.type];
   if (typeof builder !== 'function') throw 'No such chart builder '+chartConfig.options.type;
   chart = builder(chartConfig);
+  chart.document = chartConfig.document
+  chart.el = chartConfig.el
+  chart.data = chartConfig.data
+  chart.options = chartConfig.options
   plugins = chartConfig.options.plugins;
-  chart.setup();
+  if (typeof chart.initialize === 'function') chart.initialize();
+  runPluginHooks('initialize', plugins, chart);
+  if (typeof chart.setup === 'function') chart.setup();
   runPluginHooks('setup', plugins, chart);
-  chart.paint();
+  if (typeof chart.paint === 'function') chart.paint();
   runPluginHooks('paint', plugins, chart);
-  chart.plot();
+  if (typeof chart.plot === 'function') chart.plot();
   runPluginHooks('plot', plugins, chart);
   chartConfig.el.addEventListener('update', function() {
     chart.wipe();
@@ -248,7 +214,7 @@ function initializeChart(chart) {
     document: config().document
   };
 }
-},{"../utilities/slice":16,"./config":7}],9:[function(require,module,exports){
+},{"../utilities/slice":19,"./config":7}],9:[function(require,module,exports){
 var config, buildChart, config, initializeChart, _slice;
 
 initializeChart = require('./initialize-chart');
@@ -258,13 +224,16 @@ config = require('../core/config');
 
 module.exports =
 function refreshCharts() {
-  _slice(document.querySelectorAll(config().chartsSelector)).forEach(function(chart) {
-    chart = initializeChart(chart);
-    buildChart(chart);
+  
+  var charts;
+  charts = _slice(document.querySelectorAll(config().chartsSelector))
+  charts.forEach(function(chart) {
+    buildChart(initializeChart(chart));
   });
+  
 };
 
-},{"../core/config":7,"../utilities/slice":16,"./build-chart":6,"./initialize-chart":8}],10:[function(require,module,exports){
+},{"../core/config":7,"../utilities/slice":19,"./build-chart":6,"./initialize-chart":8}],10:[function(require,module,exports){
 var charts;
 
 charts = {};
@@ -313,7 +282,7 @@ module.exports = {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./core/config":7,"./core/initialize-chart":8,"./core/refresh-charts":9,"./core/register-chart":10,"./core/register-plugin":11,"./utilities/slice":16}],13:[function(require,module,exports){
+},{"./core/config":7,"./core/initialize-chart":8,"./core/refresh-charts":9,"./core/register-chart":10,"./core/register-plugin":11,"./utilities/slice":19}],13:[function(require,module,exports){
 module.exports = {
 
   paint: function() {
@@ -373,12 +342,55 @@ module.exports = {
 
 }
 },{}],15:[function(require,module,exports){
+module.exports = {
+  
+  setup: function() {
+      
+    var layers, svg;
+    svg = this.svg;
+    layers = this.layers = {};
+    layers.base = svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', '#ffffff');
+    
+  }
+
+}
+},{}],16:[function(require,module,exports){
+var createSVG;
+
+createSVG = require('../utilities/create-svg');
+
+module.exports = {
+
+  initialize: function() {
+
+    $svg = createSVG(this.document, this.el);
+    this.svg = svg = d3.select($svg);
+
+  }
+
+}
+},{"../utilities/create-svg":18}],17:[function(require,module,exports){
 var registerPlugin;
 registerPlugin = require('../core/register-plugin');
+registerPlugin('d3-svg', require('./d3-svg'));
+registerPlugin('d3-layers', require('./d3-layers'));
 registerPlugin('d3-2d-axes', require('./d3-2d-axes'));
 registerPlugin('d3-hover-point-line', require('./d3-hover-point-line'));
 
-},{"../core/register-plugin":11,"./d3-2d-axes":13,"./d3-hover-point-line":14}],16:[function(require,module,exports){
+},{"../core/register-plugin":11,"./d3-2d-axes":13,"./d3-hover-point-line":14,"./d3-layers":15,"./d3-svg":16}],18:[function(require,module,exports){
+module.exports =
+function createSVG(document, el) {
+
+  var $svg, parentNode;
+  $svg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
+  parentNode = el.parentNode;
+  parentNode.appendChild($svg);
+  parentNode.insertBefore(el, $svg);
+
+  return $svg;
+}
+
+},{}],19:[function(require,module,exports){
 module.exports =
 function _slice(arr) {
   return Array.prototype.slice.apply(arr);
