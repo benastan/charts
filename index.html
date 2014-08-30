@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/foundation/5.2.2/css/foundation.min.css" />
+    <link rel="stylesheet" href="./charts.css" type="text/css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="large-12 columns">
+          <chart type="d3-line-graph" plugins="d3-2d-axes,d3-hover-point-line" radius="2" padding="10 5 40 5">[{"x": 0,"y": 1},{"x": 1,"y": 20},{"x": 4,"y": 15},{"x": 8,"y": 34},{"x": 10,"y": 40},{"x": 20,"y": 100}]</chart>
+          <chart type="d3-pie-graph" radius="150">[{"index": "0", "value": 100},{"index": "1", "value": 200},{"index": "2", "value": 300}]</chart>
+        </div>
+      </div>
+    </div>
+    <script type="text/javascript" src="./d3.js"></script>
+    <script type="text/javascript" src="./browser.browserify.js"></script>
+  </body>
+</html>

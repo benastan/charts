@@ -1,0 +1,11 @@
+{
+  "name": "charts",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Ben Bergstein",
+  "license": "ISC"
+}
