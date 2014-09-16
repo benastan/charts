@@ -6,27 +6,23 @@ window.addEventListener('load', Charts.refreshCharts);
 require('./lib/charts');
 require('./lib/plugins');
 
-},{".":2,"./lib/charts":5,"./lib/plugins":17}],2:[function(require,module,exports){
+},{".":2,"./lib/charts":5,"./lib/plugins":16}],2:[function(require,module,exports){
 module.exports = require('./lib');
-},{"./lib":12}],3:[function(require,module,exports){
-function minAndMax(data, property) {
-  var min, max;
-  min = d3.min(data, function(datum) { datum.property });
-  max = d3.max(data, function(datum) { datum.property });
-  return [min, max]
-}
-
+},{"./lib":11}],3:[function(require,module,exports){
 function calculatePadding(paddingOption) {
+
   padding = paddingOption.split(' ');
   if (!padding[1]) padding[1] = padding[0];
   if (!padding[2]) padding[2] = padding[0];
   if (!padding[3]) padding[3] = padding[1];
   return padding;
+
 }
 
-module.exports = function(chart) {
-  var $svg, data, layers, options, padding, ranges, scales, statistics;
-  data = chart.data;
+module.exports =
+function D3LineGraph(chart) {
+
+  var data, layers, options, padding, scales, statistics;
   options = chart.options;
   options.plugins.unshift('d3-layers');
   options.plugins.unshift('d3-svg');
@@ -36,16 +32,13 @@ module.exports = function(chart) {
   padding = calculatePadding(options['padding']);
 
   return {
+
     options: options,
 
     setup: function() {
 
-      this.ranges = ranges = { x: [], y: [] };
-      ranges.y.push(100 - padding[2]);
-      ranges.x.push(100 - padding[1]);
-      ranges.y.push(padding[0]);
-      ranges.x.unshift(padding[3]);
-
+      data = this.data;
+      
       this.statistics = statistics = {};
       statistics.minX = d3.min(data, function(datum) { return datum.x });
       statistics.maxX = d3.max(data, function(datum) { return datum.x });
@@ -53,18 +46,17 @@ module.exports = function(chart) {
       statistics.maxY = d3.max(data, function(datum) { return datum.y });
 
       this.scales = scales = {};
-      scales.x = d3.scale.linear().domain([statistics.minX, statistics.maxX]).range(ranges.x);
-      scales.y = d3.scale.linear().domain([statistics.minY, statistics.maxY]).range(ranges.y);
+      scales.x = d3.scale.linear().domain([statistics.minX, statistics.maxX]).range([ padding[3], 100 - padding[1] ]);
+      scales.y = d3.scale.linear().domain([statistics.minY, statistics.maxY]).range([ 100 - padding[2], padding[0] ]);
 
     },
 
     paint: function() {
 
       layers = this.layers;
-
       layers.wrapper = this.svg.append('g')
         .selectAll('g')
-        .data(data)
+        .data(this.data)
         .enter();
 
     },
@@ -87,9 +79,9 @@ module.exports = function(chart) {
 
 },{}],4:[function(require,module,exports){
 module.exports =
-function(chart) {
+function D3PieGraph(chart) {
   
-  var $svg, arc, color, innerRadius, layers, options, radius, svg;
+  var arc, color, innerRadius, layers, options, radius;
   options = chart.options;
   radius = options.radius;
   options.plugins.unshift('d3-layers');
@@ -138,8 +130,18 @@ registerChart = require('../core/register-chart');
 registerChart('d3-line-graph', require('./d3-line-graph'));
 registerChart('d3-pie-graph', require('./d3-pie-graph'));
 
-},{"../core/register-chart":10,"./d3-line-graph":3,"./d3-pie-graph":4}],6:[function(require,module,exports){
-var ChartRegistry, PluginRegistry;
+},{"../core/register-chart":9,"./d3-line-graph":3,"./d3-pie-graph":4}],6:[function(require,module,exports){
+var config;
+
+config = null
+
+module.exports =
+function setConfig(options) {
+  if (options) config = options;
+  return config;
+}
+},{}],7:[function(require,module,exports){
+var _slice, config, ChartRegistry, PluginRegistry;
 
 ChartRegistry = require('./register-chart')();
 PluginRegistry = require('./register-plugin')();
@@ -155,50 +157,12 @@ function runPluginHooks(hookName, plugins, chart) {
   });
 }
 
-module.exports = 
-function buildChart(chartConfig) {
-  var builder, plugins;
-  builder = ChartRegistry[chartConfig.options.type];
-  if (typeof builder !== 'function') throw 'No such chart builder '+chartConfig.options.type;
-  chart = builder(chartConfig);
-  chart.document = chartConfig.document
-  chart.el = chartConfig.el
-  chart.data = chartConfig.data
-  chart.options = chartConfig.options
-  plugins = chartConfig.options.plugins;
-  if (typeof chart.initialize === 'function') chart.initialize();
-  runPluginHooks('initialize', plugins, chart);
-  if (typeof chart.setup === 'function') chart.setup();
-  runPluginHooks('setup', plugins, chart);
-  if (typeof chart.paint === 'function') chart.paint();
-  runPluginHooks('paint', plugins, chart);
-  if (typeof chart.plot === 'function') chart.plot();
-  runPluginHooks('plot', plugins, chart);
-  chartConfig.el.addEventListener('update', function() {
-    chart.wipe();
-    chart.plot();
-  });
-}
-
-},{"./register-chart":10,"./register-plugin":11}],7:[function(require,module,exports){
-var config;
-
-config = null
-
-module.exports =
-function setConfig(options) {
-  if (options) config = options;
-  return config;
-}
-},{}],8:[function(require,module,exports){
-var _slice, config;
-
 _slice = require('../utilities/slice');
 config = require('./config');
 
 module.exports =
 function initializeChart(chart) {
-  var data, options;
+  var data, options, builder, plugins;
   if (!chart.innerHTML) return;
   data = JSON.parse(chart.innerHTML);
   options = {};
@@ -207,18 +171,32 @@ function initializeChart(chart) {
   });
   if (!options.plugins) options.plugins = '';
   options.plugins = options.plugins.split(',')
-  return {
+  chartConfig = {
     el: chart,
     data: data,
     options: options,
     document: config().document
   };
+
+  builder = ChartRegistry[chartConfig.options.type];
+  if (typeof builder !== 'function') throw 'No such chart builder '+chartConfig.options.type;
+  chart = builder(chartConfig);
+  plugins = chartConfig.options.plugins;
+  
+  'document el data options'.split(' ').forEach(function(property) {
+    chart[property] = chartConfig[property]
+  });
+  
+  'initialize setup paint plot'.split(' ').forEach(function(phase) {
+    if (typeof chart[phase] === 'function') chart[phase]();
+    runPluginHooks(phase, plugins, chart);
+  });
 }
-},{"../utilities/slice":19,"./config":7}],9:[function(require,module,exports){
+
+},{"../utilities/slice":18,"./config":6,"./register-chart":9,"./register-plugin":10}],8:[function(require,module,exports){
 var config, buildChart, config, initializeChart, _slice;
 
 initializeChart = require('./initialize-chart');
-buildChart = require('./build-chart');
 _slice = require('../utilities/slice');
 config = require('../core/config');
 
@@ -228,12 +206,12 @@ function refreshCharts() {
   var charts;
   charts = _slice(document.querySelectorAll(config().chartsSelector))
   charts.forEach(function(chart) {
-    buildChart(initializeChart(chart));
+    initializeChart(chart);
   });
   
 };
 
-},{"../core/config":7,"../utilities/slice":19,"./build-chart":6,"./initialize-chart":8}],10:[function(require,module,exports){
+},{"../core/config":6,"../utilities/slice":18,"./initialize-chart":7}],9:[function(require,module,exports){
 var charts;
 
 charts = {};
@@ -242,7 +220,7 @@ module.exports = function(chartName, chartBuilder) {
   if (chartName && chartBuilder) charts[chartName] = chartBuilder;
   return charts;
 }
-},{}],11:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var plugins;
 
 plugins = {};
@@ -251,7 +229,7 @@ module.exports = function(pluginName, plugin) {
   if (pluginName && plugin) plugins[pluginName] = plugin;
   return plugins;
 }
-},{}],12:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 (function (global){
 var document, config, options, root, charts, plugins, initializeChart, registerChart, refreshCharts, _slice;
 
@@ -282,7 +260,7 @@ module.exports = {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./core/config":7,"./core/initialize-chart":8,"./core/refresh-charts":9,"./core/register-chart":10,"./core/register-plugin":11,"./utilities/slice":19}],13:[function(require,module,exports){
+},{"./core/config":6,"./core/initialize-chart":7,"./core/refresh-charts":8,"./core/register-chart":9,"./core/register-plugin":10,"./utilities/slice":18}],12:[function(require,module,exports){
 module.exports = {
 
   paint: function() {
@@ -313,7 +291,7 @@ module.exports = {
 
 }
 
-},{}],14:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 module.exports = {
   
   setup: function() {
@@ -341,7 +319,7 @@ module.exports = {
   }
 
 }
-},{}],15:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 module.exports = {
   
   setup: function() {
@@ -354,7 +332,7 @@ module.exports = {
   }
 
 }
-},{}],16:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var createSVG;
 
 createSVG = require('../utilities/create-svg');
@@ -369,7 +347,7 @@ module.exports = {
   }
 
 }
-},{"../utilities/create-svg":18}],17:[function(require,module,exports){
+},{"../utilities/create-svg":17}],16:[function(require,module,exports){
 var registerPlugin;
 registerPlugin = require('../core/register-plugin');
 registerPlugin('d3-svg', require('./d3-svg'));
@@ -377,7 +355,7 @@ registerPlugin('d3-layers', require('./d3-layers'));
 registerPlugin('d3-2d-axes', require('./d3-2d-axes'));
 registerPlugin('d3-hover-point-line', require('./d3-hover-point-line'));
 
-},{"../core/register-plugin":11,"./d3-2d-axes":13,"./d3-hover-point-line":14,"./d3-layers":15,"./d3-svg":16}],18:[function(require,module,exports){
+},{"../core/register-plugin":10,"./d3-2d-axes":12,"./d3-hover-point-line":13,"./d3-layers":14,"./d3-svg":15}],17:[function(require,module,exports){
 module.exports =
 function createSVG(document, el) {
 
@@ -390,7 +368,7 @@ function createSVG(document, el) {
   return $svg;
 }
 
-},{}],19:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 module.exports =
 function _slice(arr) {
   return Array.prototype.slice.apply(arr);
