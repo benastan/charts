@@ -6,7 +6,7 @@ window.addEventListener('load', Charts.refreshCharts);
 require('./lib/charts');
 require('./lib/plugins');
 
-},{".":2,"./lib/charts":5,"./lib/plugins":16}],2:[function(require,module,exports){
+},{".":2,"./lib/charts":5,"./lib/plugins":17}],2:[function(require,module,exports){
 module.exports = require('./lib');
 },{"./lib":11}],3:[function(require,module,exports){
 function calculatePadding(paddingOption) {
@@ -54,8 +54,10 @@ function D3LineGraph(chart) {
     paint: function() {
 
       layers = this.layers;
-      layers.wrapper = this.svg.append('g')
-        .selectAll('g')
+      layers.g = this.svg.append('g')
+        .selectAll('g');
+      
+      layers.wrapper = layers.g
         .data(this.data)
         .enter();
 
@@ -193,7 +195,7 @@ function initializeChart(chart) {
   });
 }
 
-},{"../utilities/slice":18,"./config":6,"./register-chart":9,"./register-plugin":10}],8:[function(require,module,exports){
+},{"../utilities/slice":19,"./config":6,"./register-chart":9,"./register-plugin":10}],8:[function(require,module,exports){
 var config, buildChart, config, initializeChart, _slice;
 
 initializeChart = require('./initialize-chart');
@@ -211,7 +213,7 @@ function refreshCharts() {
   
 };
 
-},{"../core/config":6,"../utilities/slice":18,"./initialize-chart":7}],9:[function(require,module,exports){
+},{"../core/config":6,"../utilities/slice":19,"./initialize-chart":7}],9:[function(require,module,exports){
 var charts;
 
 charts = {};
@@ -260,7 +262,7 @@ module.exports = {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./core/config":6,"./core/initialize-chart":7,"./core/refresh-charts":8,"./core/register-chart":9,"./core/register-plugin":10,"./utilities/slice":18}],12:[function(require,module,exports){
+},{"./core/config":6,"./core/initialize-chart":7,"./core/refresh-charts":8,"./core/register-chart":9,"./core/register-plugin":10,"./utilities/slice":19}],12:[function(require,module,exports){
 module.exports = {
 
   paint: function() {
@@ -292,6 +294,86 @@ module.exports = {
 }
 
 },{}],13:[function(require,module,exports){
+function Selection(plugin) {
+
+  this.plugin = plugin;
+  this.canvas =  this.plugin.layers.base;
+  this.start = this.getX();
+  this.rect = this.canvas.append('rect');
+
+}
+
+Selection.prototype.update = function() {
+
+  var box, end, start, width, scale;
+  
+  if (this.stopped) return;
+
+  box = this.canvas.node().getBoundingClientRect();
+  end = this.getX() - box.left;
+  start = this.start - box.left;
+  width = Math.abs(end - start) / box.width * 100;
+  
+  if (start > end) start = end;
+  start = start / box.width * 100;
+
+  this.rect
+    .attr('x', start+'%')
+    .attr('y', '0%')
+    .attr('height', '100%')
+    .attr('width', width+'%')
+    .attr('fill', 'rgba(42, 130, 176, 0.8)')
+    .attr('stroke', 'rgba(27, 107, 148, 1)')
+    .attr('stroke-width', '2');
+
+};
+
+Selection.prototype.end = function() { this.stopped = true; };
+
+Selection.prototype.clear = function() {
+
+  this.end();
+  this.rect.remove();
+
+};
+
+Selection.prototype.getX = function() { return d3.event.x; }
+
+module.exports = {
+
+  paint: function() {
+
+    var plugin, currentSelection;
+
+    plugin = this;
+
+    function mousedownEvent() {
+      if (currentSelection) currentSelection.clear();
+      currentSelection = new Selection(plugin);
+    }
+
+    function mousemoveEvent() {
+      if (currentSelection) currentSelection.update();
+    }
+
+    function mouseupEvent() {
+      if (currentSelection) currentSelection.end();
+    }
+
+    function addEventListeners(element) {
+      element.on('mousedown', mousedownEvent);
+      element.on('mousemove', mousemoveEvent);
+      element.on('mouseup', mouseupEvent);
+    }
+
+    addEventListeners(this.layers.base);
+    addEventListeners(this.layers.g);
+
+  }
+
+};
+
+},{}],14:[function(require,module,exports){
 module.exports = {
   
   setup: function() {
@@ -319,7 +401,7 @@ module.exports = {
   }
 
 }
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 module.exports = {
   
   setup: function() {
@@ -327,12 +409,13 @@ module.exports = {
     var layers, svg;
     svg = this.svg;
     layers = this.layers = {};
-    layers.base = svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', '#ffffff');
+    layers.base = svg.append('g');
+    layers.base.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', '#ffffff');
     
   }
 
 }
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var createSVG;
 
 createSVG = require('../utilities/create-svg');
@@ -347,15 +430,16 @@ module.exports = {
   }
 
 }
-},{"../utilities/create-svg":17}],16:[function(require,module,exports){
+},{"../utilities/create-svg":18}],17:[function(require,module,exports){
 var registerPlugin;
 registerPlugin = require('../core/register-plugin');
 registerPlugin('d3-svg', require('./d3-svg'));
 registerPlugin('d3-layers', require('./d3-layers'));
 registerPlugin('d3-2d-axes', require('./d3-2d-axes'));
 registerPlugin('d3-hover-point-line', require('./d3-hover-point-line'));
+registerPlugin('d3-2d-selection', require('./d3-2d-selection'));
 
-},{"../core/register-plugin":10,"./d3-2d-axes":12,"./d3-hover-point-line":13,"./d3-layers":14,"./d3-svg":15}],17:[function(require,module,exports){
+},{"../core/register-plugin":10,"./d3-2d-axes":12,"./d3-2d-selection":13,"./d3-hover-point-line":14,"./d3-layers":15,"./d3-svg":16}],18:[function(require,module,exports){
 module.exports =
 function createSVG(document, el) {
 
@@ -368,7 +452,7 @@ function createSVG(document, el) {
   return $svg;
 }
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 module.exports =
 function _slice(arr) {
   return Array.prototype.slice.apply(arr);
